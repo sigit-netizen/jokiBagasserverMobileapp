@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "src/app/api/auth/profile/[id]/route.js", "src/app/api/auth/profile/route.js"  ],
+, "src/app/api/auth/profile/[id]/route.js", "src/app/api/auth/profile/route.js", "src/app/api/upload/route.ts", "src/app/api/auth/home/judul/[id]/route.js"  ],
   "exclude": ["node_modules"]
 }

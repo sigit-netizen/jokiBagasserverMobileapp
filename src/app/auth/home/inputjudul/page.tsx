@@ -7,61 +7,80 @@ type Judul = {
   id: number;
   title: string;
   description: string;
+  cover_url?: string;
 };
 
 export default function InputJudulPage() {
   const router = useRouter();
 
+  // State untuk tambah
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [image, setImage] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // State untuk daftar
   const [list, setList] = useState<Judul[]>([]);
   const [loadingList, setLoadingList] = useState(true);
 
-  // pagination & search
+  // Pagination & search
   const [page, setPage] = useState(1);
   const limit = 3;
   const [totalPage, setTotalPage] = useState(1);
-  const [search, setSearch] = useState(""); // tambahkan state search
+  const [search, setSearch] = useState("");
 
   // Modal edit
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editImage, setEditImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
+    }
+  };
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setEditImage(file);
+      setPreviewUrl(URL.createObjectURL(file)); // Preview untuk edit
+    }
+  };
 
   // ===== FETCH LIST (PAGINATION & SEARCH) =====
   const fetchList = async (p = page) => {
-  setLoadingList(true);
-  try {
-    const url = new URL('/api/auth/home/listjudul', window.location.origin);
-    url.searchParams.set('page', String(p));
-    url.searchParams.set('limit', String(limit));
-    if (search) url.searchParams.set('search', search);
+    setLoadingList(true);
+    try {
+      const url = new URL('/api/auth/home/listjudul', window.location.origin);
+      url.searchParams.set('page', String(p));
+      url.searchParams.set('limit', String(limit));
+      if (search) url.searchParams.set('search', search);
 
-    const res = await fetch(url.toString());
-    const data = await res.json();
+      const res = await fetch(url.toString());
+      const data = await res.json();
 
-    if (data.success) {
-      // Pastikan data.data adalah array
-      setList(Array.isArray(data.data) ? data.data : []);
-      setTotalPage(data.pagination?.totalPage || 1);
-    } else {
-      setList([]); // Jika error, kosongkan list
+      if (data.success) {
+        setList(Array.isArray(data.data) ? data.data : []);
+        setTotalPage(data.pagination?.totalPage || 1);
+      } else {
+        setList([]);
+      }
+    } catch (err) {
+      console.error("Gagal memuat data:", err);
+      setList([]);
+    } finally {
+      setLoadingList(false);
     }
-  } catch (err) {
-    console.error("Gagal memuat data:", err);
-    setList([]); // Jika error, kosongkan list
-  } finally {
-    setLoadingList(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchList(page);
-  }, [page, search]); // tambahkan search ke dependency
+  }, [page, search]);
 
   // ===== SUBMIT TAMBAH =====
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,11 +88,15 @@ export default function InputJudulPage() {
     setLoading(true);
     setMessage("");
 
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    if (image) formData.append("image", image);
+
     try {
       const res = await fetch("/api/auth/home/judul", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
+        body: formData,
       });
 
       const data = await res.json();
@@ -85,7 +108,8 @@ export default function InputJudulPage() {
       setMessage("✅ Data berhasil disimpan");
       setTitle("");
       setDescription("");
-      fetchList(1); // balik ke page 1
+      setImage(null);
+      fetchList(1); // Balik ke halaman 1
       setPage(1);
     } catch {
       setMessage("❌ Gagal menyimpan data.");
@@ -99,7 +123,7 @@ export default function InputJudulPage() {
     if (!confirm("Yakin ingin menghapus judul ini?")) return;
     try {
       await fetch(`/api/auth/home/judul/${id}`, { method: "DELETE" });
-      fetchList(page);
+      fetchList(page); // Refresh halaman saat ini
     } catch {
       alert("Gagal menghapus data.");
     }
@@ -110,20 +134,22 @@ export default function InputJudulPage() {
     setEditId(item.id);
     setEditTitle(item.title);
     setEditDescription(item.description);
+    setPreviewUrl(item.cover_url || null); // Tampilkan preview gambar lama
     setShowModal(true);
   };
 
   const handleEditSubmit = async () => {
     if (!editId) return;
 
+    const formData = new FormData();
+    formData.append("title", editTitle);
+    formData.append("description", editDescription);
+    if (editImage) formData.append("image", editImage);
+
     try {
       const res = await fetch(`/api/auth/home/judul/${editId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editTitle,
-          description: editDescription,
-        }),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -133,7 +159,7 @@ export default function InputJudulPage() {
       }
 
       setShowModal(false);
-      fetchList(page);
+      fetchList(page); // Refresh halaman saat ini
     } catch {
       alert("Terjadi kesalahan saat menyimpan perubahan.");
     }
@@ -160,12 +186,19 @@ export default function InputJudulPage() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Judul"
           className="w-full px-4 py-2 border rounded mb-3 text-black"
+          required
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Deskripsi"
           rows={3}
+          className="w-full px-4 py-2 border rounded mb-3 text-black"
+        />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
           className="w-full px-4 py-2 border rounded mb-3 text-black"
         />
         <button
@@ -175,6 +208,8 @@ export default function InputJudulPage() {
           {loading ? "Menyimpan..." : "Simpan"}
         </button>
       </form>
+
+      {message && <p className="mt-4 text-green-500">{message}</p>}
 
       {/* SEARCH INPUT */}
       <div className="mb-6">
@@ -199,32 +234,48 @@ export default function InputJudulPage() {
               list.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white p-4 border rounded"
+                  className="bg-white p-4 border rounded flex items-start gap-4"
                 >
-                  <h3 className="font-semibold text-black">{item.title}</h3>
-                  <p className="text-gray-600">{item.description}</p>
+                  {/* Gambar di kiri */}
+                  {item.cover_url ? (
+                    <img
+                      src={item.cover_url}
+                      alt={`Cover ${item.title}`}
+                      className="w-24 h-24 object-cover rounded border shrink-0"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded border shrink-0">
+                      <span className="text-gray-500 text-sm">No Image</span>
+                    </div>
+                  )}
 
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() =>
-                        router.push(`/auth/home/chapter/${item.id}`)
-                      }
-                      className="px-3 py-1 bg-indigo-600 text-white rounded"
-                    >
-                      📖 Chapter
-                    </button>
-                    <button
-                      onClick={() => openEdit(item)}
-                      className="px-3 py-1 bg-yellow-500 text-white rounded"
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="px-3 py-1 bg-red-600 text-white rounded"
-                    >
-                      🗑️ Delete
-                    </button>
+                  {/* Judul dan deskripsi di sebelah kanan gambar */}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-black">{item.title}</h3>
+                    <p className="text-gray-600 mt-1">{item.description}</p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() =>
+                          router.push(`/auth/home/chapter/${item.id}`)
+                        }
+                        className="px-3 py-1 bg-indigo-600 text-white rounded"
+                      >
+                        📖 Chapter
+                      </button>
+                      <button
+                        onClick={() => openEdit(item)}
+                        className="px-3 py-1 bg-yellow-500 text-white rounded"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -271,6 +322,23 @@ export default function InputJudulPage() {
               rows={3}
               className="w-full border p-2 mb-4 text-black"
             />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleEditImageChange}
+              className="w-full border p-2 mb-4 text-black"
+            />
+
+            {previewUrl && (
+              <div className="mb-4">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="w-32 h-32 object-cover rounded border"
+                />
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowModal(false)} className="px-3 py-1 bg-gray-600 text-white rounded">
                 Batal

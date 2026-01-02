@@ -9,7 +9,7 @@ export async function GET(request) {
 
     // Ambil query param
     let page = Number(searchParams.get("page")) || 1;
-    let limit = Number(searchParams.get("limit")) || 3;
+    let limit = Number(searchParams.get("limit")) || 5;
     const search = searchParams.get("search") || "";
 
     // Validasi
@@ -24,7 +24,7 @@ export async function GET(request) {
 
     // Ambil data judul dengan pencarian dan pagination
     const [rows] = await db.query(
-      `SELECT id, title, description FROM judul ${searchCondition} ORDER BY id ASC LIMIT ? OFFSET ?`,
+      `SELECT id, title, description, cover_url FROM judul ${searchCondition} ORDER BY id ASC LIMIT ? OFFSET ?`,
       search ? [searchTerm, limit, offset] : [limit, offset]
     );
 
