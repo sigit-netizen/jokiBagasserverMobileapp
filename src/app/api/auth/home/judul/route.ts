@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
     fs.writeFileSync(filePath, buffer);
 
-    const imageUrl = `/uploads/judul/${fileName}`;
+    const imageUrl = `/uploads/novels/${fileName}`;
 
     // Simpan data ke database
     await db.query(
