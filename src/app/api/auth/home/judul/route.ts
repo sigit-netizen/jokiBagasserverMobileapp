@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
     const uploadDir = path.join(
       process.cwd(),
-      "public/uploads/judul"
+      "public/uploads/novels"
     );
 
     if (!fs.existsSync(uploadDir)) {

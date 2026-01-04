@@ -80,7 +80,7 @@ export async function PUT(request, { params }) {
 
       const uploadDir = path.join(
         process.cwd(),
-        "public/uploads/judul"
+        "public/uploads/novels"
       );
 
       if (!fs.existsSync(uploadDir)) {
@@ -92,7 +92,7 @@ export async function PUT(request, { params }) {
 
       fs.writeFileSync(filePath, buffer);
 
-      imageUrl = `/uploads/judul/${fileName}`;
+      imageUrl = `/uploads/novels/${fileName}`;
     }
 
     // Update data ke database

@@ -26,7 +26,7 @@ export default function InputJudulPage() {
 
   // Pagination & search
   const [page, setPage] = useState(1);
-  const limit = 3;
+  const limit = 5;
   const [totalPage, setTotalPage] = useState(1);
   const [search, setSearch] = useState("");
 
