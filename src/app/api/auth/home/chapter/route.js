@@ -18,7 +18,7 @@ export async function GET(request) {
 
     // Pagination
     let page = Number(searchParams.get("page")) || 1;
-    let limit = Number(searchParams.get("limit")) || 5; // default 5 chapter per page
+    let limit = Number(searchParams.get("limit")) || 100; // default 5 chapter per page
 
     page = Math.max(1, page);
     limit = Math.max(1, Math.min(100, limit)); // max 100 per halaman

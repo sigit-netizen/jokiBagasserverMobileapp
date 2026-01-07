@@ -204,7 +204,7 @@ export default function ChapterPage() {
             ))
           )}
 
-          {/* ===== PAGINATION ===== */}
+          {/* ===== PAGINATION =====
           <div className="flex justify-between items-center mt-6">
             <button
               disabled={page === 1}
@@ -225,7 +225,7 @@ export default function ChapterPage() {
             >
               Next
             </button>
-          </div>
+          </div> */}
         </>
       )}
     </div>
