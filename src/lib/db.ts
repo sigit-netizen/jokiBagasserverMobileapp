@@ -1,8 +1,10 @@
-import mysql from "mysql2/promise";
+import { createClient } from '@supabase/supabase-js'
 
-export const db = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "animeverse",
-});
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+
+// Keep db export for compatibility during migration if needed,
+// but we will eventually replace its usage.
+export const db = supabase

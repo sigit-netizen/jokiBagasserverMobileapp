@@ -1,7 +1,7 @@
 // app/api/auth/users/route.ts
 
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function GET(request) {
   try {
@@ -17,19 +17,20 @@ export async function GET(request) {
     const offset = (page - 1) * limit;
 
     // Ambil data user dengan pagination
-    const [rows] = await db.query(
-      "SELECT id, nama, email FROM user ORDER BY id ASC LIMIT ? OFFSET ?",
-      [limit, offset]
-    );
+    const { data: rows, error, count } = await supabase
+      .from("users")
+      .select("id, nama, email", { count: "exact" })
+      .order("id", { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    // Hitung total data
-    const [[totalRow]] = await db.query("SELECT COUNT(*) AS total FROM user");
-    const totalData = Number(totalRow.total);
+    if (error) throw error;
+
+    const totalData = count || 0;
     const totalPage = Math.ceil(totalData / limit);
 
     return NextResponse.json({
       success: true,
-      data: rows, // ✅ Ubah dari `rows` ke `data`
+      data: rows,
       pagination: {
         page,
         limit,

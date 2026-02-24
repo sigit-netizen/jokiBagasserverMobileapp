@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 // REGEX VALIDASI EMAIL
@@ -45,12 +45,13 @@ export async function POST(request: Request) {
     }
 
     // === Cek Email Sudah Ada ===
-    const [cek]: any = await db.query(
-      "SELECT id FROM user WHERE email = ?",
-      [email]
-    );
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
 
-    if (cek.length > 0) {
+    if (existingUser) {
       return NextResponse.json(
         {
           success: false,
@@ -64,10 +65,22 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // === Simpan User ===
-    await db.query(
-      "INSERT INTO user (nama, email, password) VALUES (?, ?, ?)",
-      [nama, email, hashedPassword]
-    );
+    const { error: insertError } = await supabase
+      .from("users")
+      .insert([{ nama, email, password: hashedPassword }]);
+
+    if (insertError) {
+      if (insertError.code === "23505") { // Unique violation in Postgres
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Email sudah terdaftar",
+          },
+          { status: 409 }
+        );
+      }
+      throw insertError;
+    }
 
     return NextResponse.json(
       {
@@ -81,17 +94,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    // === Tangkap Duplicate (Extra Safety) ===
-    if (error.code === "ER_DUP_ENTRY") {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Email sudah terdaftar",
-        },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       {
         success: false,

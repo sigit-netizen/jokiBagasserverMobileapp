@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import fs from "fs";
 import path from "path";
 
-
-
 export async function DELETE(request, context) {
     try {
-        const { id } = await context.params; // ✅ WAJIB await
+        const { id } = await context.params;
 
-        await db.query("DELETE FROM judul WHERE id = ?", [id]);
+        const { error } = await supabase
+          .from("judul")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
 
         return NextResponse.json({
             success: true,
@@ -29,14 +32,12 @@ export async function DELETE(request, context) {
 
 export async function PUT(request, { params }) {
   try {
-    // ✅ Gunakan await untuk mendapatkan nilai id dari params
     const { id } = await params;
-
     const formData = await request.formData();
 
     const title = formData.get("title");
     const description = formData.get("description");
-    const image = formData.get("image"); // Bisa null jika tidak diupload
+    const image = formData.get("image");
 
     if (!title || !description) {
       return NextResponse.json(
@@ -46,19 +47,22 @@ export async function PUT(request, { params }) {
     }
 
     // Ambil data lama dari database
-    const [oldRow] = await db.query("SELECT cover_url FROM judul WHERE id = ?", [id]);
+    const { data: oldRow, error: fetchError } = await supabase
+      .from("judul")
+      .select("cover_url")
+      .eq("id", id)
+      .single();
 
-    if (oldRow.length === 0) {
+    if (fetchError || !oldRow) {
       return NextResponse.json(
         { success: false, message: "Data tidak ditemukan" },
         { status: 404 }
       );
     }
 
-    let imageUrl = oldRow[0].cover_url; // Default: tetap pakai gambar lama
+    let imageUrl = oldRow.cover_url;
 
     if (image && image.size > 0) {
-      // Validasi tipe file
       if (!image.type || !image.type.startsWith("image/")) {
         return NextResponse.json(
           { success: false, message: "File yang diunggah bukan gambar" },
@@ -66,7 +70,6 @@ export async function PUT(request, { params }) {
         );
       }
 
-      // Hapus gambar lama jika ada
       if (imageUrl) {
         const oldImagePath = path.join(process.cwd(), "public", imageUrl);
         if (fs.existsSync(oldImagePath)) {
@@ -74,7 +77,6 @@ export async function PUT(request, { params }) {
         }
       }
 
-      // Simpan gambar baru
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
@@ -96,10 +98,12 @@ export async function PUT(request, { params }) {
     }
 
     // Update data ke database
-    await db.query(
-      "UPDATE judul SET title = ?, description = ?, cover_url = ? WHERE id = ?",
-      [title, description, imageUrl, id]
-    );
+    const { error: updateError } = await supabase
+      .from("judul")
+      .update({ title, description, cover_url: imageUrl })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
 
     return NextResponse.json({
       success: true,

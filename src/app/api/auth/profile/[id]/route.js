@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 // REGEX VALIDASI EMAIL
@@ -9,9 +9,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
    GET - PROFILE BY ID
 ========================= */
 export async function GET(request, { params }) {
-  const { id } = await params; // ✅ Gunakan await params
-  console.log("🚀 params.id (sekarang):", id); // 🔍 Debug log
-
+  const { id } = await params;
   try {
     const userId = Number(id);
 
@@ -22,19 +20,18 @@ export async function GET(request, { params }) {
       );
     }
 
-    const [rows] = await db.query(
-      "SELECT id, nama, email FROM user WHERE id = ?",
-      [userId]
-    );
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, nama, email")
+      .eq("id", userId)
+      .single();
 
-    if (rows.length === 0) {
+    if (error || !user) {
       return NextResponse.json(
         { success: false, message: "User tidak ditemukan" },
         { status: 404 }
       );
     }
-
-    const user = rows[0];
 
     return NextResponse.json({
       success: true,
@@ -98,12 +95,14 @@ export async function PUT(request, { params }) {
 
     // Cek apakah email sudah digunakan oleh user lain (jika email diisi)
     if (email) {
-      const [existingUser] = await db.query(
-        "SELECT id FROM user WHERE email = ? AND id != ?",
-        [email, userId]
-      );
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .neq("id", userId)
+        .single();
 
-      if (existingUser.length > 0) {
+      if (existingUser) {
         return NextResponse.json(
           { success: false, message: "Email sudah digunakan oleh user lain" },
           { status: 409 }
@@ -111,41 +110,21 @@ export async function PUT(request, { params }) {
       }
     }
 
-    // Siapkan field yang akan di-update
-    const updates = [];
-    const values = [];
-
-    if (nama) {
-      updates.push("nama = ?");
-      values.push(nama);
-    }
-
-    if (email) {
-      updates.push("email = ?");
-      values.push(email);
-    }
-
+    // Siapkan data yang akan di-update
+    const updateData = {};
+    if (nama) updateData.nama = nama;
+    if (email) updateData.email = email;
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      updates.push("password = ?");
-      values.push(hashedPassword);
-    }
-
-    // Tambahkan userId ke akhir values
-    values.push(userId);
-
-    if (updates.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "Tidak ada data yang diperbarui" },
-        { status: 400 }
-      );
+      updateData.password = await bcrypt.hash(password, 10);
     }
 
     // Update data user
-    await db.query(
-      `UPDATE user SET ${updates.join(", ")} WHERE id = ?`,
-      values
-    );
+    const { error: updateError } = await supabase
+      .from("users")
+      .update(updateData)
+      .eq("id", userId);
+
+    if (updateError) throw updateError;
 
     return NextResponse.json({
       success: true,
@@ -164,7 +143,7 @@ export async function PUT(request, { params }) {
    DELETE - HAPUS USER BY ID
 ========================= */
 export async function DELETE(request, { params }) {
-  const { id } = await params; // ✅ Gunakan await params
+  const { id } = await params;
 
   try {
     const userId = Number(id);
@@ -176,21 +155,13 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // Cek apakah user ada
-    const [rows] = await db.query(
-      "SELECT id FROM user WHERE id = ?",
-      [userId]
-    );
-
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "User tidak ditemukan" },
-        { status: 404 }
-      );
-    }
-
     // Hapus user
-    await db.query("DELETE FROM user WHERE id = ?", [userId]);
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId);
+
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,

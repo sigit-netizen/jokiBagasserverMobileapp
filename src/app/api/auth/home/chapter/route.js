@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 /* =========================
    GET - LIST CHAPTER (WITH PAGINATION)
@@ -18,25 +18,24 @@ export async function GET(request) {
 
     // Pagination
     let page = Number(searchParams.get("page")) || 1;
-    let limit = Number(searchParams.get("limit")) || 100; // default 5 chapter per page
+    let limit = Number(searchParams.get("limit")) || 100;
 
     page = Math.max(1, page);
-    limit = Math.max(1, Math.min(100, limit)); // max 100 per halaman
+    limit = Math.max(1, Math.min(100, limit));
 
     const offset = (page - 1) * limit;
 
     // Ambil data chapter dengan pagination
-    const [rows] = await db.query(
-      "SELECT id, chapter, isi FROM content WHERE id_judul = ? ORDER BY chapter ASC LIMIT ? OFFSET ?",
-      [judulId, limit, offset]
-    );
+    const { data: rows, error, count } = await supabase
+      .from("content")
+      .select("id, chapter, isi", { count: "exact" })
+      .eq("id_judul", judulId)
+      .order("chapter", { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    // Hitung total data
-    const [[totalRow]] = await db.query(
-      "SELECT COUNT(*) AS total FROM content WHERE id_judul = ?",
-      [judulId]
-    );
-    const totalData = Number(totalRow.total);
+    if (error) throw error;
+
+    const totalData = count || 0;
     const totalPage = Math.ceil(totalData / limit);
 
     return NextResponse.json({
@@ -72,12 +71,13 @@ export async function POST(request) {
     }
 
     // Validasi: cek apakah judulId ada di tabel judul
-    const [judulCheck] = await db.query(
-      "SELECT id FROM judul WHERE id = ?",
-      [judulId]
-    );
+    const { data: judulCheck, error: fetchError } = await supabase
+      .from("judul")
+      .select("id")
+      .eq("id", judulId)
+      .single();
 
-    if (judulCheck.length === 0) {
+    if (fetchError || !judulCheck) {
       return NextResponse.json(
         { success: false, message: `Judul dengan ID ${judulId} tidak ditemukan` },
         { status: 404 }
@@ -85,12 +85,14 @@ export async function POST(request) {
     }
 
     // Cek duplicate chapter
-    const [cek] = await db.query(
-      "SELECT id FROM content WHERE id_judul = ? AND chapter = ?",
-      [judulId, chapter]
-    );
+    const { data: cekDuplicate } = await supabase
+      .from("content")
+      .select("id")
+      .eq("id_judul", judulId)
+      .eq("chapter", chapter)
+      .single();
 
-    if (cek.length > 0) {
+    if (cekDuplicate) {
       return NextResponse.json(
         {
           success: false,
@@ -100,10 +102,19 @@ export async function POST(request) {
       );
     }
 
-    await db.query(
-      "INSERT INTO content (id_judul, chapter, isi) VALUES (?, ?, ?)",
-      [judulId, chapter, isi]
-    );
+    const { error: insertError } = await supabase
+      .from("content")
+      .insert([{ id_judul: judulId, chapter: Number(chapter), isi }]);
+
+    if (insertError) {
+      if (insertError.code === "23505") {
+        return NextResponse.json(
+          { success: false, message: "Chapter sudah ada" },
+          { status: 409 }
+        );
+      }
+      throw insertError;
+    }
 
     return NextResponse.json(
       { success: true, message: "Chapter berhasil ditambahkan" },
@@ -111,14 +122,6 @@ export async function POST(request) {
     );
 
   } catch (error) {
-    // safety net UNIQUE
-    if (error.code === "ER_DUP_ENTRY") {
-      return NextResponse.json(
-        { success: false, message: "Chapter sudah ada" },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 }

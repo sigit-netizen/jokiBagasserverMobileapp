@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function GET() {
   try {
-    const [rows] = await db.query("SELECT 1 AS status");
+    const { data, error } = await supabase.from("users").select("count").limit(1);
+
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,
-      message: "Database connected",
-      data: rows,
+      message: "Supabase connected",
+      data: data,
     });
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        message: "Database NOT connected",
+        message: "Supabase NOT connected",
         error: (error as Error).message,
       },
       { status: 500 }

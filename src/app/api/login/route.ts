@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
@@ -19,13 +19,14 @@ export async function POST(request: Request) {
     }
 
     // === Cari User berdasarkan Nama ===
-    const [rows]: any = await db.query(
-      "SELECT id, nama, password FROM user WHERE nama = ?",
-      [nama]
-    );
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, nama, password")
+      .eq("nama", nama)
+      .single();
 
-    // ❌ Nama tidak ditemukan
-    if (rows.length === 0) {
+    // ❌ Nama tidak ditemukan atau error
+    if (error || !user) {
       return NextResponse.json(
         {
           success: false,
@@ -34,8 +35,6 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-
-    const user = rows[0];
 
     // === Bandingkan Password ===
     const isPasswordValid = await bcrypt.compare(password, user.password);

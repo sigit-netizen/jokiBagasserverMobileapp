@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function POST(request: Request) {
   try {
@@ -28,12 +28,13 @@ export async function POST(request: Request) {
     }
 
     // Cek judul sudah ada
-    const [cekRows] = await db.query(
-      "SELECT id FROM judul WHERE title = ?",
-      [title]
-    );
+    const { data: existingJudul, error: checkError } = await supabase
+      .from("judul")
+      .select("id")
+      .eq("title", title)
+      .single();
 
- if (Array.isArray(cekRows) && cekRows.length > 0) {
+    if (existingJudul) {
       return NextResponse.json(
         {
           success: false,
@@ -64,10 +65,22 @@ export async function POST(request: Request) {
     const imageUrl = `/uploads/novels/${fileName}`;
 
     // Simpan data ke database
-    await db.query(
-      "INSERT INTO judul (title, description, cover_url) VALUES (?, ?, ?)",
-      [title, description, imageUrl]
-    );
+    const { error: insertError } = await supabase
+      .from("judul")
+      .insert([{ title, description, cover_url: imageUrl }]);
+
+    if (insertError) {
+      if (insertError.code === "23505") { // Postgres unique violation
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Judul sudah ada, gunakan judul lain",
+          },
+          { status: 409 }
+        );
+      }
+      throw insertError;
+    }
 
     return NextResponse.json(
       {
@@ -78,16 +91,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    if (error.code === "ER_DUP_ENTRY") {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Judul sudah ada, gunakan judul lain",
-        },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       {
         success: false,

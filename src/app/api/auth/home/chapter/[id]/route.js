@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 // ==========================
 // GET — ambil isi chapter
@@ -8,12 +8,13 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params;
 
-    const [rows] = await db.query(
-      "SELECT id, isi FROM content WHERE id = ?",
-      [id]
-    );
+    const { data: chapter, error } = await supabase
+      .from("content")
+      .select("id, isi")
+      .eq("id", id)
+      .single();
 
-    if (!rows || rows.length === 0) {
+    if (error || !chapter) {
       return NextResponse.json(
         { success: false, message: "Chapter tidak ditemukan" },
         { status: 404 }
@@ -22,7 +23,7 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      data: rows[0], // ← OBJECT
+      data: chapter,
     });
   } catch (error) {
     return NextResponse.json(
@@ -47,17 +48,12 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const [result] = await db.query(
-      "UPDATE content SET isi = ? WHERE id = ?",
-      [isi, id]
-    );
+    const { error } = await supabase
+      .from("content")
+      .update({ isi })
+      .eq("id", id);
 
-    if (!result || result.affectedRows === 0) {
-      return NextResponse.json(
-        { success: false, message: "Chapter tidak ditemukan" },
-        { status: 404 }
-      );
-    }
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,
@@ -78,17 +74,12 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
 
-    const [result] = await db.query(
-      "DELETE FROM content WHERE id = ?",
-      [id]
-    );
+    const { error } = await supabase
+      .from("content")
+      .delete()
+      .eq("id", id);
 
-    if (!result || result.affectedRows === 0) {
-      return NextResponse.json(
-        { success: false, message: "Chapter tidak ditemukan" },
-        { status: 404 }
-      );
-    }
+    if (error) throw error;
 
     return NextResponse.json({
       success: true,

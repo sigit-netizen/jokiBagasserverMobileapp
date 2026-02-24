@@ -1,7 +1,7 @@
 // app/api/auth/home/listjudul/route.ts
 
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function GET(request) {
   try {
@@ -18,27 +18,27 @@ export async function GET(request) {
 
     const offset = (page - 1) * limit;
 
-    // Query pencarian: hanya cocokkan judul
-    const searchCondition = search ? "WHERE title LIKE ?" : "";
-    const searchTerm = `%${search}%`;
-
     // Ambil data judul dengan pencarian dan pagination
-    const [rows] = await db.query(
-      `SELECT id, title, description, cover_url FROM judul ${searchCondition} ORDER BY id ASC LIMIT ? OFFSET ?`,
-      search ? [searchTerm, limit, offset] : [limit, offset]
-    );
+    let query = supabase
+      .from("judul")
+      .select("*", { count: "exact" });
 
-    // Hitung total data
-    const [[totalRow]] = await db.query(
-      `SELECT COUNT(*) AS total FROM judul ${searchCondition}`,
-      search ? [searchTerm] : []
-    );
-    const totalData = Number(totalRow.total);
+    if (search) {
+      query = query.ilike("title", `%${search}%`);
+    }
+
+    const { data: rows, error, count } = await query
+      .order("id", { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const totalData = count || 0;
     const totalPage = Math.ceil(totalData / limit);
 
     return NextResponse.json({
       success: true,
-      data: rows, // ← pastikan ini adalah array
+      data: rows,
       pagination: {
         page,
         limit,
