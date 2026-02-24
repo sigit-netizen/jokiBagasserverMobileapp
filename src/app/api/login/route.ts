@@ -18,7 +18,33 @@ export async function POST(request: Request) {
       );
     }
 
-    // === Cari User berdasarkan Nama ===
+    // === 1. Cek Login Admin (Via Supabase Auth) ===
+    // Karena form di depan hanya ada "Nama", asumsikan admin memasukkan Email di kotak "Nama"
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: nama, // Mencoba login dengan email
+      password: password
+    });
+
+    if (!authError && authData.user) {
+      // ✅ Cukup pastikan login Auth berhasil, langsung beri akses Admin
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Login admin berhasil",
+          data: {
+            id: authData.user.id,
+            nama: "Admin", // Boleh disesuaikan
+            isAdmin: true,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // === 2. Cek Login User Biasa (Tabel 'users') ===
+    // Jika authError terjadi (misal: "nama" diisi huruf biasa, bukan email)
+    // Maka lanjut ngecek ke tabel users
+
     const { data: user, error } = await supabase
       .from("users")
       .select("id, nama, password")
@@ -36,7 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // === Bandingkan Password ===
+    // === Bandingkan Password Normal ===
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     // ❌ Password salah
@@ -50,7 +76,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ Login Berhasil
+    // ✅ Normal User Login Berhasil
     return NextResponse.json(
       {
         success: true,
@@ -58,6 +84,7 @@ export async function POST(request: Request) {
         data: {
           id: user.id,
           nama: user.nama,
+          isAdmin: false,
         },
       },
       { status: 200 }

@@ -26,9 +26,15 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        // Simpan data login sederhana di localStorage (untuk demo)
+        // Simpan data login di localStorage
         localStorage.setItem("user", JSON.stringify(data.data));
-        router.push("/auth/home/inputjudul");
+        
+        // Cek admin vs user normal
+        if (data.data.isAdmin) {
+          router.push("/auth/user");
+        } else {
+          router.push("/auth/home/inputjudul");
+        }
       } else {
         setError(data.message || "Login gagal. Silakan cek kembali nama dan password.");
       }
